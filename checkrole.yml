@@ -1,0 +1,26 @@
+---
+
+# check host role
+
+- name: Validate hosts against desired cluster state
+  hosts: all
+  gather_facts: true
+  vars:
+    inventory:
+      localhost:
+        mon,osd
+      meathead:
+        mon
+      eric:
+        osd,rgw,mon
+
+  tasks:
+    - name: check host configuration against desired ceph role(s)
+      ceph_check_role:
+        role: "{{ inventory[inventory_hostname] }}"
+        facts: "{{ ansible_facts }}"
+        mode: prod
+      register: result
+
+    - name: RESULTS
+      debug: var=result
