@@ -123,7 +123,8 @@ def get_network_info(ansible_facts):
     valid_nics = [
         "ether",
         "bonding",
-        "bridge"
+        "bridge",
+        "infiniband"
     ]
 
     nic_blacklist = ('lo')
@@ -148,10 +149,10 @@ def get_network_info(ansible_facts):
             net_str = '{}/{}'.format(network, cidr)
             subnets.add(net_str)
 
-            if ansible_facts[nic_id].get('type') == 'ether':
+            if ansible_facts[nic_id].get('type') in ['ether', 'infiniband']:
                 devs = [nic_id]
                 speed = ansible_facts[nic_id].get('speed', 0)
-                count = len(devs)
+                count = 1
 
             elif ansible_facts[nic_id].get("type") == "bridge":
                 count = speed = 0
