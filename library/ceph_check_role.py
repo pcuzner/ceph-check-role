@@ -236,6 +236,8 @@ class Checker(object):
                 "ram": 3072},
         "mon": {"cpu": 2,
                 "ram": 4096},
+        "mds": {"cpu": 2,
+                "ram": 4096},
         "rgw": {"cpu": 4,
                 "ram": 2048},
         "iscsi": {"cpu": 4,
