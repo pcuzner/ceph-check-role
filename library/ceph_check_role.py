@@ -269,7 +269,7 @@ class Checker(object):
             else:
                 return 'OK'
         else:
-            if any(msg.startswith('error') for msg in self.status_msgs):
+            if any(msg.startswith(('critical', 'error')) for msg in self.status_msgs):
                 return 'NOTOK'
             else:
                 return 'OK'
