@@ -42,7 +42,8 @@ Here's a breakdown of the checks performed;
 - each role has a predefined ram profile, so these are summed and compared to the host. Shortages result in warnings
 - role collocation is checked. In rpm mode only osd and rgw roles are flagged as valid. For a container deployment, no collocation restrictions are enforced
 - overall status is returned to the caller as OK or NOTOK, together with specific error messages for diagnostics
-- in prod mode, 'warnings' become 'errors' which result in an overall NOTOK status  
+- in prod mode, 'warnings' become 'errors' which result in an overall NOTOK status
+- for monitor hosts the freespace under /var/lib is checked  
 
 ## Example Output
 Here's an example of the kind of output you can expect. You can see the result of the checks in the ```status``` and ```status_msgs``` variables.  
