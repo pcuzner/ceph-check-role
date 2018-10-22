@@ -1,8 +1,8 @@
-
+import os
 import yaml
+import inspect
 from collections import OrderedDict
 from ansible.module_utils.basic import AnsibleModule
-import inspect
 
 
 DOCUMENTATION = """
@@ -245,6 +245,11 @@ class Checker(object):
                   "ram": 16384}
     }
 
+    fs_threshold = {
+        "dev": {"free": 10, "severity": "warning"},
+        "prod": {"free": 30, "severity": "error"}
+    }
+
     def __init__(self, host_details, roles, deployment_type='rpm', mode='prod'):
         self.host_details = host_details
         # Let's assume(!) that the larger of the hdd/ssd number is the number of osd
@@ -358,6 +363,16 @@ class Checker(object):
 
         if available_ram < self.reqs['os']['ram']:
             self._add_problem('error', 'RAM too low')
+
+    def _check_mon_freespace(self):
+        self._add_check("check mon freespace")
+        if 'mon' in self.roles:
+            var_lib = os.statvfs('/var/lib')
+            free_bytes = var_lib.f_bsize * var_lib.f_bfree
+            if free_bytes / 1024**3 < self.fs_threshold[self.mode]["free"]:
+                self._add_problem(self.fs_threshold[self.mode]['severity'],
+                                  "Freespace on /var/lib is too low "
+                                  "(<{}GB)".format(self.fs_threshold[self.mode]["free"]))
 
 
 def run_module():
