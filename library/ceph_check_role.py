@@ -101,6 +101,21 @@ def get_free_disks(devices, rotational=1):
     return OrderedDict(sorted(free.items()))
 
 
+def get_server_details(ansible_facts):
+    """
+    Get the server model from the facts
+    """
+
+    # this is a simplistic first pass at putting this info together!
+    vendor = ansible_facts['system_vendor']
+    if ansible_facts["product_version"] == 'NA':
+        model = ansible_facts["product_name"]
+    else:
+        model = ansible_facts["product_version"]
+
+    return vendor, model
+
+
 def get_network_info(ansible_facts):
     """
     Look at the ansible facts to extract subnet ranges and configuration
@@ -219,6 +234,7 @@ def summarize(facts):
     summary['hdd_count'] = len(summary['hdd'])
     summary['ssd_count'] = len(summary['ssd'])
     summary['network'] = get_network_info(facts)
+    summary['vendor'], summary['model'] = get_server_details(facts)
 
     return summary
 
