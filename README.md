@@ -5,6 +5,10 @@ This project provides a custom ansible module. It's goal is to validate a candid
 - python 2.7 or python 3.x
 - ansible 2.6 or above
 
+## Tested Against
+- RHEL 7.4 : ansible 2.6.5, python 2.7.5
+- Fedora 28: ansible 2.7.0, python 2.7.15
+
 ## Custom Module Description
 The module takes the following parameters;  
 
@@ -12,8 +16,7 @@ The module takes the following parameters;
 |------|-------------|----------|---------|
 | mode | describes the usage of the cluster, either prod or dev | No | prod |
 | deployment | describes the type of deployment, either rpm or container | No | rpm |
-| facts | A string containing the output of a gather_facts process from the current playbook | Yes | NONE |
-| roles | A comma separated string that describes the intended Ceph roles that the host should support (mon, osd, rgw, iscsi, mds) | Yes | NONE |
+| roles | A comma separated string that describes the intended Ceph roles that the host should support (mons, osds, rgws, iscsigws, mdss) | Yes | NONE |
 
 ### Invocation Example
 ```
@@ -21,17 +24,16 @@ The module takes the following parameters;
     - name: check host configuration against desired ceph role(s)
       ceph_check_role:
         role: "{{ inventory[inventory_hostname] }}"
-        facts: "{{ ansible_facts }}"
         mode: prod
+        deployment: rpm
       register: result
 ```  
-*An example playbook is provided called ```checkrole.yml``` which illustrates the format of the inventory variable, shown in the above example.* 
+*An example playbook is provided called ```checkrole.yml``` which illustrates the format of the inventory variable used in the above example.* 
 
 ## Validation Logic
-The basis of the checks is the host configuration data that ansible provides with it's "gather_facts" process. These 'facts' are passed 
-into ceph_check_role module, summarized and then used to check common installation factors like cpu, ram, disks and network. 
+The basis of the checks is the host configuration data that ansible provides with it's "gather_facts" process. These 'facts' are gathered by the module itself using the same collectors that Ansible's ```setup``` module uses. The host facts are analysed against the required roles to determine whether host is capable of supporting the role, or combination of roles. The analysis uses various factors including; cpu, ram, disks and network.  
 
-All validity logic is held within the Checker class. This class takes as input the summary data from ansible_facts, and executes all methods prefixed by "_check". To add more checks, just add another _check method!
+All validity logic is held within a ```Checker``` class. This class takes as input the summary data from ansible_facts, and executes all methods prefixed by "_check". So to add more checks, you just need to add another _check method!  
 
 Here's a breakdown of the checks performed;  
 - hosts with an osd role, **must** have free disks.
@@ -54,7 +56,7 @@ ok: [eric] => {
         "data": {
             "deployment_type": "rpm", 
             "mode": "prod", 
-            "role": "osd,rgw,mon", 
+            "role": "osds,rgws,mons", 
             <b>"status": "NOTOK", </b>
             <b>"status_msgs": [
                 "critical:OSD role without any free disks", 
