@@ -1,8 +1,10 @@
 import os
-import yaml
 import inspect
 from collections import OrderedDict
+
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.facts.namespace import PrefixFactNamespace
+from ansible.module_utils.facts import ansible_collector, default_collectors
 
 
 DOCUMENTATION = """
@@ -11,19 +13,14 @@ module:
 ceph_check_role
 description:
   - This module performs validity checks for a given set of ceph roles against
-the current hosts ansible_facts
+the hosts ansible_facts
 
 
 options:
   role:
     description:
       - string (comma separated) containing the roles to validate the host's
-        configuration against (mon,osd,rgw,mds,iscsi)
-    required: true
-    default: none
-  facts:
-    description:
-      - string representation of the ansible_facts
+        configuration against (mons,osds,rgws,mdss,iscsigws)
     required: true
     default: none
   mode:
@@ -37,7 +34,7 @@ options:
     default: 'rpm'
     required: false
 
-requirements: ['ceph_checker', 'ansible >= 2.6']
+requirements: ['ansible >= 2.6']
 
 author:
   - 'Paul Cuzner'
@@ -51,7 +48,7 @@ def netmask_to_cidr(netmask):
 
 
 def get_cpu_type(processor_list):
-
+    """ Extract and return a list of processor names """
     # each processor has 3 items, id, manufacturer and model
     # we just want the model
     names = processor_list[2::3]
@@ -93,6 +90,9 @@ def get_free_disks(devices, rotational=1):
         # skip child devices of software RAID
         if disk['links']['masters']:
             continue
+        # skip USB devices
+        if disk['host'].upper().startswith("USB"):
+            continue
 
         if int(disk['rotational']) == rotational:
             if not disk['partitions']:
@@ -104,6 +104,16 @@ def get_free_disks(devices, rotational=1):
 def get_server_details(ansible_facts):
     """
     Get the server model from the facts
+
+    Args:
+        ansible_facts: host facts from the ansible collector (setup) run
+
+    Return:
+        vendor: Server vendor name
+        model: Server model eg. PowerEdge R730
+
+    Exceptions:
+        None
     """
 
     # this is a simplistic first pass at putting this info together!
@@ -249,15 +259,15 @@ class Checker(object):
     reqs = {
         "os": {"cpu": 2,
                "ram": 4096},
-        "osd": {"cpu": .5,
+        "osds": {"cpu": .5,
                 "ram": 3072},
-        "mon": {"cpu": 2,
+        "mons": {"cpu": 2,
                 "ram": 4096},
-        "mds": {"cpu": 2,
+        "mdss": {"cpu": 2,
                 "ram": 4096},
-        "rgw": {"cpu": 4,
+        "rgws": {"cpu": 4,
                 "ram": 2048},
-        "iscsi": {"cpu": 4,
+        "iscsigws": {"cpu": 4,
                   "ram": 16384}
     }
 
@@ -325,7 +335,7 @@ class Checker(object):
                     self._add_problem(severity, "too many roles for RPM deployment mode")
                     return
                 else:
-                    if all(role in ['osd', 'rgw'] for role in self.roles):
+                    if all(role in ['osds', 'rgws'] for role in self.roles):
                         return
                     else:
                         self._add_problem(severity,
@@ -333,12 +343,12 @@ class Checker(object):
 
     def _check_osd(self):
         self._add_check("_check_osd")
-        if 'osd' in self.roles and self.osd_count == 0:
+        if 'osds' in self.roles and self.osd_count == 0:
             self._add_problem("critical", "OSD role without any free disks")
 
     def _check_network(self):
         self._add_check("_check_network")
-        if 'osd' not in self.roles:
+        if 'osds' not in self.roles:
             return
 
         optimum_bandwidth = self.osd_count * self.osd_bandwidth[self.osd_media]
@@ -350,7 +360,7 @@ class Checker(object):
         available_cpu = self.host_details['cpu_core_count']
 
         for role in self.roles:
-            if role == 'osd':
+            if role == 'osds':
                 available_cpu -= (self.osd_count * self.reqs[role]['cpu'])
             else:
                 available_cpu -= (self.reqs[role]['cpu'])
@@ -360,7 +370,7 @@ class Checker(object):
 
     def _check_rgw(self):
         self._add_check("_check_rgw")
-        if 'rgw' not in self.roles:
+        if 'rgws' not in self.roles:
             return
 
         # prod mode - we should have at least 1 x 10g link
@@ -372,7 +382,7 @@ class Checker(object):
         available_ram = self.host_details['ram_mb']
 
         for role in self.roles:
-            if role == 'osd':
+            if role == 'osds':
                 available_ram -= (self.osd_count * self.reqs[role]['ram'])
             else:
                 available_ram -= self.reqs[role]['ram']
@@ -382,7 +392,7 @@ class Checker(object):
 
     def _check_mon_freespace(self):
         self._add_check("check mon freespace")
-        if 'mon' in self.roles:
+        if 'mons' in self.roles:
             var_lib = os.statvfs('/var/lib')
             free_bytes = var_lib.f_bsize * var_lib.f_bfree
             if free_bytes / 1024**3 < self.fs_threshold[self.mode]["free"]:
@@ -395,9 +405,6 @@ def run_module():
 
     fields = dict(
         role=dict(
-            type='str',
-            required=True),
-        facts=dict(
             type='str',
             required=True),
         mode=dict(
@@ -415,20 +422,30 @@ def run_module():
     module = AnsibleModule(argument_spec=fields,
                            supports_check_mode=False)
 
+    # Define the ansible collector logic, as used by the ansible "setup" module
+    all_collector_classes = default_collectors.collectors
+    minimal_gather_subset = frozenset(['apparmor', 'caps', 'cmdline', 'date_time',
+                                       'distribution', 'dns', 'env', 'fips', 'local',
+                                       'lsb', 'pkg_mgr', 'platform', 'python', 'selinux',
+                                       'service_mgr', 'ssh_pub_keys', 'user'])
+
+    namespace = PrefixFactNamespace(namespace_name='ansible',
+                                    prefix='')
+
+    fact_collector = \
+        ansible_collector.get_ansible_collector(all_collector_classes=all_collector_classes,
+                                                namespace=namespace,
+                                                filter_spec="*",
+                                                gather_subset=['all'],
+                                                gather_timeout=10,
+                                                minimal_gather_subset=minimal_gather_subset)
+
+    # Get the facts from the host
+    ansible_facts = fact_collector.collect(module=module)
+
     role = module.params.get('role')
-
     mode = module.params.get('mode')
-    facts = module.params.get('facts')
     deployment_type = module.params.get('deployment')
-
-    # use yaml to convert the ansible_facts string to a usable python object
-    try:
-        ansible_facts = yaml.load(facts)
-    except Exception as e:
-        module.fail_json(
-            changed=False,
-            msg="Unable to decode the ansible_facts: {}".format(e)
-        )
 
     summary = summarize(ansible_facts)
     checker = Checker(host_details=summary, roles=role, deployment_type=deployment_type, mode=mode)
