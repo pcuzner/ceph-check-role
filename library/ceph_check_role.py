@@ -480,14 +480,14 @@ class Checker(object):
                 return
             else:
                 if num_roles > 2:
-                    self._add_problem(severity, "too many roles for RPM deployment mode")
+                    self._add_problem(severity, "Too many roles for RPM deployment mode")
                     return
                 else:
                     if all(role in ['osds', 'rgws'] for role in self.roles):
                         return
                     else:
                         self._add_problem(severity,
-                                          "requested roles ({}) may not coexist".format(','.join(self.roles)))
+                                          "Requested roles ({}) may not coexist".format(','.join(self.roles)))
 
     def _check_osd(self):
         self._add_check("_check_osd")
@@ -501,7 +501,7 @@ class Checker(object):
 
         optimum_bandwidth = self.osd_count * self.osd_bandwidth[self.osd_media]
         if self.net_max < optimum_bandwidth:
-            self._add_problem("warning", "network bandwith low for the number of potential OSDs")
+            self._add_problem("warning", "Network bandwith low for the number of potential OSDs")
 
     def _check_cpu(self):
         self._add_check("_check_cpu")
@@ -523,7 +523,7 @@ class Checker(object):
 
         # prod mode - we should have at least 1 x 10g link
         if self.net_max < 10000:
-            self._add_problem("warning", "network bandwidth low for rgw role")
+            self._add_problem("warning", "Network bandwidth low for rgw role")
 
     def _check_ram(self):
         self._add_check("_check_ram")
