@@ -384,6 +384,9 @@ def summarize(facts):
         facts.get('processor_cores', 0)
 
     summary['ram_mb'] = facts['memory_mb']['real']['total']
+    summary['kernel'] = facts['kernel']
+    summary['distribution'] = facts['distribution']
+    summary['distribution_version'] = facts['distribution_version']
 
     # extract the stats the summary stats to validate against
     summary['cpu_type'] = get_cpu_type(facts.get('processor', []))
