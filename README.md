@@ -46,6 +46,7 @@ Here's a breakdown of the checks performed;
 - overall status is returned to the caller as OK or NOTOK, together with specific error messages for diagnostics
 - in prod mode, 'warnings' become 'errors' which result in an overall NOTOK status
 - for monitor hosts the freespace under /var/lib is checked  
+- for iscsi gateway hosts check the OS version (if RHEL), or kernel version for non-RHEL hosts is compatible
 
 ## Example Output
 Here's an example of the kind of output you can expect. You can see the result of the checks in the ```status``` and ```status_msgs``` variables.  

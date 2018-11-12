@@ -551,6 +551,37 @@ class Checker(object):
                                   "Freespace on /var/lib is too low "
                                   "(<{}GB)".format(self.fs_threshold[self.mode]["free"]))
 
+    def _check_iscsi(self):
+        self._add_check('check iscsi gateway pre-reqs')
+        if 'iscsigws' in self.roles:
+
+            if self.host_details['distribution'] == 'RedHat':
+                maj_v, min_v = self.host_details['distribution_version'].split('.')
+                version_int = ( int(maj_v) * 10) + (int(min_v) * 1)
+                # check the version is above 7.5
+                maj_v, min_v = self.host_details['distribution_version'].split('.')
+                version_int = (int(maj_v) * 10) + (int(min_v) * 1)
+                if version_int > 80:
+                    # RHEL 8 just let it go
+                    return
+                elif version_int > 75:
+                    # RHEL 7.5 or above is OK
+                    return
+                else:
+                    # invalid version of RHEL for iscsi
+                    self._add_problem("critical", "incompatible kernel version for iSCSI")
+                    return
+            else:
+                # check kernel version is 4.16 or above
+                kern_v, maj_v = self.host_details['kernel'].split('.')[:2]
+                kernel_int = (int(kern_v) * 100) + (int(maj_v))
+                if kernel_int >= 416:
+                    # kernel veersion is OK to use
+                    return
+                else:
+                    self._add_problem("critical", "incompatible kernel version for iSCSI")
+                    return
+
 
 def run_module():
 
