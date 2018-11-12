@@ -316,7 +316,7 @@ def get_network_info(ansible_facts):
         # look for ipv4 information
         nic_config = ansible_facts[nic_id].get('ipv4', None)
         if nic_config:
-
+            addr = nic_config['address']
             network = nic_config['network']
             cidr = netmask_to_cidr(nic_config['netmask'])
             net_str = '{}/{}'.format(network, cidr)
@@ -354,7 +354,8 @@ def get_network_info(ansible_facts):
                 "devices": devs,
                 "speed": speed,
                 "count": count,
-                "desc": desc
+                "desc": desc,
+                "addr": addr
             }
 
     return {
