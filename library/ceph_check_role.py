@@ -38,10 +38,16 @@ options:
         required: false
 
     deployment:
-        default: "rpm"
+        default: "container"
         type: string
         description:
             - String denoting the deployment mechanism; either 'container' or 'rpm'.
+        required: false
+    flashusage:
+        default: "journal"
+        type: string
+        description:
+            - define how flash capacity is to be used (journal or data)
         required: false
 
 
@@ -428,7 +434,7 @@ class Checker(object):
         "prod": {"free": 30, "severity": "error"}
     }
 
-    def __init__(self, host_details, roles, deployment_type='rpm', mode='prod'):
+    def __init__(self, host_details, roles, deployment_type='container', mode='prod', flash_usage='journal'):
         self.host_details = host_details
         # Let's assume(!) that the larger of the hdd/ssd number is the number of osd
         # devices
@@ -437,6 +443,7 @@ class Checker(object):
         self.roles = roles.split(',')
         self.deployment_type = deployment_type
         self.mode = mode
+        self.flash_usage = flash_usage
         self.status_msgs = []
         self.status_checks = []
 
@@ -586,6 +593,8 @@ class Checker(object):
 
 def run_module():
 
+    valid_roles = set(['mons', 'mdss', 'osds', 'rgws', 'iscsigws'])
+
     fields = dict(
         role=dict(
             type='str',
@@ -598,7 +607,12 @@ def run_module():
         deployment=dict(
             type='str',
             choices=['container', 'rpm'],
-            default='rpm',
+            default='container',
+            required=False),
+        flashusage=dict(
+            type='str',
+            choices=['journal', 'data'],
+            default='journal',
             required=False)
     )
 
@@ -627,11 +641,19 @@ def run_module():
     ansible_facts = fact_collector.collect(module=module)
 
     role = module.params.get('role')
+    flash_usage = module.params.get('flashusage')
     mode = module.params.get('mode')
     deployment_type = module.params.get('deployment')
 
+    role_list = role.split(',')
+    
+
     summary = summarize(ansible_facts)
-    checker = Checker(host_details=summary, roles=role, deployment_type=deployment_type, mode=mode)
+    checker = Checker(host_details=summary, 
+                      roles=role, 
+                      deployment_type=deployment_type, 
+                      mode=mode,
+                      flash_usage=flash_usage)
     checker.analyse()
 
     module.exit_json(
@@ -639,6 +661,7 @@ def run_module():
         data={
             "role": role,
             "mode": mode,
+            "flashusage": flash_usage,
             "deployment_type": deployment_type,
             'summary_facts': summary,
             'status_msgs': sorted(checker.status_msgs),
