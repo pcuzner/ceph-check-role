@@ -370,6 +370,57 @@ def get_network_info(ansible_facts):
     }
 
 
+def human_bytes(bytes_in, mode='bin'):
+    """
+    Return a human readable version of bytes. Precision varies depending
+    on size - anything > 1PiB is resolved to 1 decimal place
+
+    Args:
+        bytes_in : number to convert
+    
+    Return:
+        String containing human readable version of bytes_in
+
+    Exceptions:
+        None
+    """
+    
+    divisor = 1024.0 if mode == 'bin' else 1000.0
+
+    prec = 0
+    units = ['','K','M','G','T','P','E','Z']
+    for ptr in range(len(units)):
+        if ptr > 4:
+            prec = 1
+        if abs(bytes_in) < divisor:
+            return "{:.{}f}{}".format(bytes_in, prec, units[ptr])
+        bytes_in /= divisor
+    return "{:.{}f}{}".format(bytes_in, prec, 'Y')
+
+
+def get_free_capacity(free_disks):
+    """
+    Determine the total free capacity of the hdds and ssd's received
+    returning a total for each category in human readable format
+
+    Args:
+        free_disks : dictionary containing free disks (from ansible facts)
+
+    Return:
+        String containing a human readable total of the capacity 
+
+    Exceptions:
+        None
+    """
+    total_bytes = 0
+
+    for dev in free_disks.keys():
+        device = free_disks[dev]
+        total_bytes += int(device['sectors']) * int(device['sectorsize'])
+
+    return human_bytes(total_bytes)
+
+
 def summarize(facts):
     """
     Look at the ansible_facts and distill down to those settings that impact
@@ -401,6 +452,8 @@ def summarize(facts):
     summary['ssd'] = get_free_disks(facts['devices'], rotational=0)
     summary['hdd_count'] = len(summary['hdd'])
     summary['ssd_count'] = len(summary['ssd'])
+    summary['capacity'] = "{} / {}".format(get_free_capacity(summary['hdd']),
+                                           get_free_capacity(summary['ssd']))
     summary['network'] = get_network_info(facts)
     summary['vendor'], summary['model'] = get_server_details(facts)
 
