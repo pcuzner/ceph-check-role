@@ -43,6 +43,14 @@ options:
         description:
             - String denoting the deployment mechanism; either 'container' or 'rpm'.
         required: false
+
+    osdtype:
+        default: "bluestore"
+        type: string
+        description:
+            - String denoting the type of osd objectstore to use bluestore or filestore
+        required: false
+
     flashusage:
         default: "journal"
         type: string
@@ -105,6 +113,11 @@ data:
             description: Extracted and summarized facts from ansible_facts
             type: complex 
             contains:
+                capacity:
+                    description: String showing the free HDD and SSD capacity on the host
+                    type: str (hdd capacity / ssd capacity)
+                    sample:
+                      - 16T / 256G
                 cpu_core_count: 
                     description: Number of cpu cores
                     type: int
@@ -189,6 +202,8 @@ data:
 
 import os
 import inspect
+import math
+
 from collections import OrderedDict
 
 from ansible.module_utils.basic import AnsibleModule
@@ -467,6 +482,13 @@ class Checker(object):
         'ssd': 5000
     }
 
+    journal_size = 21474836480 # 20GiB
+
+    flash_ratio = {
+        'nvme': 10,
+        'ssd': 5
+    }
+
     reqs = {
         "os": {"cpu": 2,
                "ram": 4096},
@@ -487,7 +509,14 @@ class Checker(object):
         "prod": {"free": 30, "severity": "error"}
     }
 
-    def __init__(self, host_details, roles, deployment_type='container', mode='prod', flash_usage='journal'):
+    def __init__(self, 
+                 host_details, 
+                 roles,
+                 deployment_type='container',
+                 mode='prod',
+                 flash_usage='journal',
+                 osd_type='bluestore'):
+
         self.host_details = host_details
         # Let's assume(!) that the larger of the hdd/ssd number is the number of osd
         # devices
@@ -497,6 +526,7 @@ class Checker(object):
         self.deployment_type = deployment_type
         self.mode = mode
         self.flash_usage = flash_usage
+        self.osd_type = osd_type
         self.status_msgs = []
         self.status_checks = []
 
@@ -643,6 +673,40 @@ class Checker(object):
                     self._add_problem("critical", "incompatible kernel version for iSCSI")
                     return
 
+    def _check_disk_ratio(self):
+        self._add_check('check disk ratio for osd roles')
+        if 'osds' not in self.roles:
+            return
+        
+        # Process the configuration to check the ratio of ssd:hdd is OK
+        if self.host_details['ssd_count'] > 0 and self.flash_usage == 'journal':
+            if self.host_details['hdd_count'] > 0:
+                osds_supported = 0
+                flash_capacity = 0
+                # we have hdd's, so calculate how many osd's we can support
+                for flash_device in self.host_details['ssd'].keys():
+                    flash_capacity += int(self.host_details['ssd'][flash_device]['sectors']) * \
+                                      int(self.host_details['ssd'][flash_device]['sectorsize'])  
+
+                    if flash_device.startswith('nvm'):
+                        osds_supported += Checker.flash_ratio['nvme']
+                    else:
+                        osds_supported += Checker.flash_ratio['ssd']
+
+                if osds_supported < self.host_details['hdd_count']:
+                    self._add_problem("critical", 
+                                      "Not enough SSD/flash devices for {}"
+                                      " OSDs (min {}NVME or {}SSD needed)".format(self.host_details['hdd_count'],
+                                      int(math.ceil(self.host_details['hdd_count'] / Checker.flash_ratio['nvme'])),
+                                      int(math.ceil(self.host_details['hdd_count'] / Checker.flash_ratio['ssd']))))
+
+                total_journal_space = (Checker.journal_size * self.host_details['hdd_count'])
+                if flash_capacity / total_journal_space < 1:
+                    self._add_problem("critical",
+                                      "SSD/flash capacity too low for {}"
+                                      " OSDs(min {} needed)".format(self.host_details['hdd_count'],
+                                                                    human_bytes(total_journal_space)))
+                
 
 def run_module():
 
@@ -661,6 +725,11 @@ def run_module():
             type='str',
             choices=['container', 'rpm'],
             default='container',
+            required=False),
+        osdtype=dict(
+            type='str',
+            choices=['bluestore', 'filestore'],
+            default='bluestore',
             required=False),
         flashusage=dict(
             type='str',
@@ -695,6 +764,7 @@ def run_module():
 
     role = module.params.get('role')
     flash_usage = module.params.get('flashusage')
+    osd_type = module.params.get('osdtype')
     mode = module.params.get('mode')
     deployment_type = module.params.get('deployment')
 
@@ -706,7 +776,8 @@ def run_module():
                       roles=role, 
                       deployment_type=deployment_type, 
                       mode=mode,
-                      flash_usage=flash_usage)
+                      flash_usage=flash_usage,
+                      osd_type=osd_type)
     checker.analyse()
 
     module.exit_json(
