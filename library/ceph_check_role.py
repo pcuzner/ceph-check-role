@@ -600,15 +600,18 @@ class Checker(object):
     def _check_cpu(self):
         self._add_check("_check_cpu")
         available_cpu = self.host_details['cpu_core_count']
+        required_cpu = 0
 
         for role in self.roles:
             if role == 'osds':
-                available_cpu -= (self.osd_count * self.reqs[role]['cpu'])
+                required_cpu += (self.osd_count * self.reqs[role]['cpu'])
             else:
-                available_cpu -= (self.reqs[role]['cpu'])
+                required_cpu += (self.reqs[role]['cpu'])
+        
+        required_cpu += self.reqs['os']['cpu']
 
-        if available_cpu < self.reqs['os']['cpu']:
-            self._add_problem('error', "#CPU's too low")
+        if required_cpu > available_cpu:
+            self._add_problem('error', "#CPU's too low (min {} needed)".format(int(required_cpu)))
 
     def _check_rgw(self):
         self._add_check("_check_rgw")
@@ -622,15 +625,17 @@ class Checker(object):
     def _check_ram(self):
         self._add_check("_check_ram")
         available_ram = self.host_details['ram_mb']
+        required_ram = 0
 
         for role in self.roles:
             if role == 'osds':
-                available_ram -= (self.osd_count * self.reqs[role]['ram'])
+                required_ram += (self.osd_count * self.reqs[role]['ram'])
             else:
-                available_ram -= self.reqs[role]['ram']
+                required_ram += self.reqs[role]['ram']
 
-        if available_ram < self.reqs['os']['ram']:
-            self._add_problem('error', 'RAM too low')
+        required_ram += self.reqs['os']['ram']
+        if required_ram > available_ram:
+            self._add_problem('error', 'RAM too low (min {} needed)'.format(human_bytes(required_ram * 1024**2)))
 
     def _check_mon_freespace(self):
         self._add_check("check mon freespace")
