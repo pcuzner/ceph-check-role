@@ -21,3 +21,5 @@
         role: "{{ inventory[inventory_hostname] }}"
         mode: prod
         deployment: rpm
+        flashusage: journal
+        osdtype: bluestore
