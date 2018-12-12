@@ -64,7 +64,7 @@ requirements:
 
 notes:
   - this module does not change host state, and doesn't support check mode.
-'''
+''' # noqa
 
 
 EXAMPLES = '''
@@ -198,7 +198,7 @@ data:
                     sample:
                       - 4096
             
-'''
+''' # noqa
 
 import os
 import inspect
@@ -398,12 +398,12 @@ def human_bytes(bytes_in, mode='bin'):
 
     Exceptions:
         None
-    """
-    
+    """ # noqa
+
     divisor = 1024.0 if mode == 'bin' else 1000.0
 
     prec = 0
-    units = ['','K','M','G','T','P','E','Z']
+    units = ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']
     for ptr in range(len(units)):
         if ptr > 4:
             prec = 1
@@ -426,14 +426,14 @@ def get_free_capacity(free_disks):
 
     Exceptions:
         None
-    """
+    """ # noqa
     total_bytes = 0
 
     for dev in free_disks.keys():
         device = free_disks[dev]
         total_bytes += int(device['sectors']) * int(device['sectorsize'])
 
-    return human_bytes(total_bytes)
+    return total_bytes
 
 
 def summarize(facts):
@@ -449,7 +449,7 @@ def summarize(facts):
 
     Exceptions:
         None
-    """
+    """ # noqa
 
     summary = {}
     summary['cpu_core_count'] = facts.get('processor_count', 0) * \
@@ -467,8 +467,8 @@ def summarize(facts):
     summary['ssd'] = get_free_disks(facts['devices'], rotational=0)
     summary['hdd_count'] = len(summary['hdd'])
     summary['ssd_count'] = len(summary['ssd'])
-    summary['capacity'] = "{} / {}".format(get_free_capacity(summary['hdd']),
-                                           get_free_capacity(summary['ssd']))
+    summary['capacity'] = "{} / {}".format(human_bytes(get_free_capacity(summary['hdd'])),
+                                           human_bytes(get_free_capacity(summary['ssd']))) # noqa E501
     summary['network'] = get_network_info(facts)
     summary['vendor'], summary['model'] = get_server_details(facts)
 
@@ -482,7 +482,8 @@ class Checker(object):
         'ssd': 5000
     }
 
-    journal_size = 21474836480 # 20GiB
+    bluestore_journal_ratio = 0.04          # 4% of HDD size for block.db
+    filestore_journal_size = 10737418240    # 10GiB
 
     flash_ratio = {
         'nvme': 10,
@@ -493,15 +494,15 @@ class Checker(object):
         "os": {"cpu": 2,
                "ram": 4096},
         "osds": {"cpu": .5,
-                "ram": 3072},
+                 "ram": 3072},
         "mons": {"cpu": 2,
-                "ram": 4096},
+                 "ram": 4096},
         "mdss": {"cpu": 2,
-                "ram": 4096},
+                 "ram": 4096},
         "rgws": {"cpu": 4,
-                "ram": 2048},
+                 "ram": 2048},
         "iscsigws": {"cpu": 4,
-                  "ram": 16384}
+                     "ram": 16384}
     }
 
     fs_threshold = {
@@ -509,8 +510,8 @@ class Checker(object):
         "prod": {"free": 30, "severity": "error"}
     }
 
-    def __init__(self, 
-                 host_details, 
+    def __init__(self,
+                 host_details,
                  roles,
                  deployment_type='container',
                  mode='prod',
@@ -607,7 +608,7 @@ class Checker(object):
                 required_cpu += (self.osd_count * self.reqs[role]['cpu'])
             else:
                 required_cpu += (self.reqs[role]['cpu'])
-        
+
         required_cpu += self.reqs['os']['cpu']
 
         if required_cpu > available_cpu:
@@ -653,7 +654,7 @@ class Checker(object):
 
             if self.host_details['distribution'] == 'RedHat':
                 maj_v, min_v = self.host_details['distribution_version'].split('.')
-                version_int = ( int(maj_v) * 10) + (int(min_v) * 1)
+                version_int = (int(maj_v) * 10) + (int(min_v) * 1)
                 # check the version is above 7.5
                 maj_v, min_v = self.host_details['distribution_version'].split('.')
                 version_int = (int(maj_v) * 10) + (int(min_v) * 1)
@@ -682,7 +683,7 @@ class Checker(object):
         self._add_check('check disk ratio for osd roles')
         if 'osds' not in self.roles:
             return
-        
+
         # Process the configuration to check the ratio of ssd:hdd is OK
         if self.host_details['ssd_count'] > 0 and self.flash_usage == 'journal':
             if self.host_details['hdd_count'] > 0:
@@ -691,7 +692,7 @@ class Checker(object):
                 # we have hdd's, so calculate how many osd's we can support
                 for flash_device in self.host_details['ssd'].keys():
                     flash_capacity += int(self.host_details['ssd'][flash_device]['sectors']) * \
-                                      int(self.host_details['ssd'][flash_device]['sectorsize'])  
+                        int(self.host_details['ssd'][flash_device]['sectorsize'])
 
                     if flash_device.startswith('nvm'):
                         osds_supported += Checker.flash_ratio['nvme']
@@ -699,23 +700,30 @@ class Checker(object):
                         osds_supported += Checker.flash_ratio['ssd']
 
                 if osds_supported < self.host_details['hdd_count']:
-                    self._add_problem("critical", 
-                                      "Not enough SSD/flash devices for {}"
-                                      " OSDs (min {}NVME or {}SSD needed)".format(self.host_details['hdd_count'],
-                                      int(math.ceil(self.host_details['hdd_count'] / Checker.flash_ratio['nvme'])),
-                                      int(math.ceil(self.host_details['hdd_count'] / Checker.flash_ratio['ssd']))))
-
-                total_journal_space = (Checker.journal_size * self.host_details['hdd_count'])
-                if flash_capacity / total_journal_space < 1:
                     self._add_problem("critical",
+                                      "Not enough SSD/flash devices for {}"
+                                      " OSDs (min {}NVME or {}SSD needed)".format(
+                                          self.host_details['hdd_count'],
+                                          int(math.ceil(self.host_details['hdd_count'] / Checker.flash_ratio['nvme'])),
+                                          int(math.ceil(self.host_details['hdd_count'] / Checker.flash_ratio['ssd']))))
+
+                if self.osd_type == 'bluestore':
+                    total_capacity = get_free_capacity(self.host_details['hdd'])
+                    total_journal_rqmt = total_capacity * self.bluestore_journal_ratio
+                else:
+                    total_journal_rqmt = (self.filestore_journal_size * self.host_details['hdd_count'])
+
+                if flash_capacity / total_journal_rqmt < 1:
+                    self._add_problem("error",
                                       "SSD/flash capacity too low for {}"
-                                      " OSDs(min {} needed)".format(self.host_details['hdd_count'],
-                                                                    human_bytes(total_journal_space)))
-                
+                                      " {} OSDs(min {} needed)".format(self.host_details['hdd_count'],
+                                                                       self.osd_type,
+                                                                       human_bytes(total_journal_rqmt)))
+
 
 def run_module():
 
-    valid_roles = set(['mons', 'mdss', 'osds', 'rgws', 'iscsigws'])
+    valid_roles = set(['mons', 'mdss', 'osds', 'rgws', 'mgrs', 'iscsigws'])
 
     fields = dict(
         role=dict(
@@ -746,6 +754,19 @@ def run_module():
     module = AnsibleModule(argument_spec=fields,
                            supports_check_mode=False)
 
+    flash_usage = module.params.get('flashusage')
+    osd_type = module.params.get('osdtype')
+    mode = module.params.get('mode')
+    deployment_type = module.params.get('deployment')
+    role = module.params.get('role')
+
+    role_list = role.split(',')
+    # abort if the roles provided don't match with the defaults
+    if not all(role in valid_roles for role in role_list):
+        module.fail_json(
+            msg="Invalid roles specfified. Must be {}".format(','.join(valid_roles))
+        )
+
     # Define the ansible collector logic, as used by the ansible "setup" module
     all_collector_classes = default_collectors.collectors
     minimal_gather_subset = frozenset(['apparmor', 'caps', 'cmdline', 'date_time',
@@ -767,19 +788,10 @@ def run_module():
     # Get the facts from the host
     ansible_facts = fact_collector.collect(module=module)
 
-    role = module.params.get('role')
-    flash_usage = module.params.get('flashusage')
-    osd_type = module.params.get('osdtype')
-    mode = module.params.get('mode')
-    deployment_type = module.params.get('deployment')
-
-    role_list = role.split(',')
-    
-
     summary = summarize(ansible_facts)
-    checker = Checker(host_details=summary, 
-                      roles=role, 
-                      deployment_type=deployment_type, 
+    checker = Checker(host_details=summary,
+                      roles=role,
+                      deployment_type=deployment_type,
                       mode=mode,
                       flash_usage=flash_usage,
                       osd_type=osd_type)
@@ -790,6 +802,7 @@ def run_module():
         data={
             "role": role,
             "mode": mode,
+            "osdtype": osd_type,
             "flashusage": flash_usage,
             "deployment_type": deployment_type,
             'summary_facts': summary,
