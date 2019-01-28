@@ -5,14 +5,21 @@
 - name: Validate hosts against desired cluster state
   hosts: all
   gather_facts: false
+  vars:
+    inventory:
+      ceph-1:
+        mons,osds
+      ceph-2:
+        mons,osds
+      ceph-3:
+        mons,osds
 
   tasks:
  
     - name: CEPH_CHECK_ROLE
       ceph_check_role:
         role: "{{ inventory[inventory_hostname] }}"
-        mode: "{{ mode }}"
-        deployment: "{{ deployment }}"
-        flashusage: "{{ flashusage }}"
-        osdtype: "{{ osdtype }}"
-
+        mode: prod
+        deployment: rpm
+        flashusage: journal
+        osdtype: bluestore
