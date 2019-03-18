@@ -1,5 +1,5 @@
 # ceph_check_role  
-This project provides a custom ansible module. It's goal is to validate a candidate Ceph host, against the intended Ceph roles and where problems are found pass them back, so they can be consumed by other ansible tasks or systems that run playbooks programmitically.  
+This project provides a custom ansible module. It's goal is to validate a candidate Ceph host, against the intended Ceph roles and where problems are found pass them back, so they can be consumed by other ansible tasks or systems that run playbooks programmatically.  
 
 ## Requirements
 - python 2.7 or python 3.x
