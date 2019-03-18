@@ -609,7 +609,8 @@ class Checker(object):
         required_cpu += self.reqs['os']['cpu']
 
         if required_cpu > available_cpu:
-            self._add_problem('error', "#CPU's too low (min {} needed)".format(int(required_cpu)))
+            msg_level = "warning" if self.mode == 'dev' else 'error'
+            self._add_problem(msg_level, "#CPU's too low (min {} needed)".format(int(required_cpu)))
 
     def _check_rgw(self):
         self._add_check("_check_rgw")
@@ -633,7 +634,8 @@ class Checker(object):
 
         required_ram += self.reqs['os']['ram']
         if required_ram > available_ram:
-            self._add_problem('error', 'RAM too low (min {} needed)'.format(human_bytes(required_ram * 1024**2)))
+            msg_level = "warning" if self.mode == 'dev' else 'error'
+            self._add_problem(msg_level, 'RAM too low (min {} needed)'.format(human_bytes(required_ram * 1024**2)))
 
     def _check_mon_freespace(self):
         self._add_check("check mon freespace")
