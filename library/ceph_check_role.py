@@ -760,6 +760,14 @@ def run_module():
     role = module.params.get('role')
 
     role_list = role.split(',')
+    # If the host has an undefined role, it's in the ansible inventory, but not in the 
+    # inventory we've received. This typically happens for the metrics host (ceph-grafana)
+    if role_list == ['undefined']:
+        module.exit_json(
+                changed=False,
+                msg="host doesn't have a ceph role, nothing to do"
+                )
+
     # abort if the roles provided don't match with the defaults
     if not all(role in valid_roles for role in role_list):
         module.fail_json(
