@@ -286,11 +286,11 @@ def get_server_details(ansible_facts):
     """
 
     # this is a simplistic first pass at putting this info together!
-    vendor = ansible_facts['system_vendor']
-    if ansible_facts["product_version"] == 'NA':
-        model = ansible_facts["product_name"]
+    vendor = ansible_facts['ansible_system_vendor']
+    if ansible_facts["ansible_product_version"] == 'NA':
+        model = ansible_facts["ansible_product_name"]
     else:
-        model = ansible_facts["product_version"]
+        model = ansible_facts["ansible_product_version"]
 
     return vendor, model
 
@@ -322,7 +322,7 @@ def get_network_info(ansible_facts):
     ]
 
     nic_blacklist = ('lo')
-    nics = [nic for nic in ansible_facts.get('interfaces') if not nic.startswith(nic_blacklist)]
+    nics = ['ansible_{}'.format(nic) for nic in ansible_facts.get('ansible_interfaces') if not nic.startswith(nic_blacklist)]
 
     # Now process the nic list again so we can lookup speeds against pnics
     for nic_id in nics:
@@ -452,19 +452,19 @@ def summarize(facts):
     """ # noqa
 
     summary = {}
-    summary['cpu_core_count'] = facts.get('processor_count', 0) * \
-        facts.get('processor_threads_per_core', 1) * \
-        facts.get('processor_cores', 0)
+    summary['cpu_core_count'] = facts.get('ansible_processor_count', 0) * \
+        facts.get('ansible_processor_threads_per_core', 1) * \
+        facts.get('ansible_processor_cores', 0)
 
-    summary['ram_mb'] = facts['memory_mb']['real']['total']
-    summary['kernel'] = facts['kernel']
-    summary['distribution'] = facts['distribution']
-    summary['distribution_version'] = facts['distribution_version']
+    summary['ram_mb'] = facts['ansible_memtotal_mb'] 
+    summary['kernel'] = facts['ansible_kernel']
+    summary['distribution'] = facts['ansible_distribution']
+    summary['distribution_version'] = facts['ansible_distribution_version']
 
     # extract the stats the summary stats to validate against
-    summary['cpu_type'] = get_cpu_type(facts.get('processor', []))
-    summary['hdd'] = get_free_disks(facts['devices'])
-    summary['ssd'] = get_free_disks(facts['devices'], rotational=0)
+    summary['cpu_type'] = get_cpu_type(facts.get('ansible_processor', []))
+    summary['hdd'] = get_free_disks(facts['ansible_devices'])
+    summary['ssd'] = get_free_disks(facts['ansible_devices'], rotational=0)
     summary['hdd_count'] = len(summary['hdd'])
     summary['ssd_count'] = len(summary['ssd'])
     summary['capacity'] = "{} / {}".format(human_bytes(get_free_capacity(summary['hdd'])),
@@ -782,7 +782,7 @@ def run_module():
                                        'service_mgr', 'ssh_pub_keys', 'user'])
 
     namespace = PrefixFactNamespace(namespace_name='ansible',
-                                    prefix='')
+                                    prefix='ansible_')
 
     fact_collector = \
         ansible_collector.get_ansible_collector(all_collector_classes=all_collector_classes,
