@@ -17,7 +17,7 @@ description:
     - This module performs validity checks for a given set of ceph roles against
       the hosts ansible_facts.
 
-version_added: "2.6"
+version_added: "2.7"
 author: Paul Cuzner (@pcuzner)
 
 options:
@@ -321,8 +321,8 @@ def get_network_info(ansible_facts):
         "infiniband"
     ]
 
-    nic_blacklist = ('lo')
-    nics = ['ansible_{}'.format(nic) for nic in ansible_facts.get('ansible_interfaces') if not nic.startswith(nic_blacklist)]
+    nic_blacklist = ('lo', 'virbr', 'tun')
+    nics = ['ansible_{}'.format(nic.replace('-','_')) for nic in ansible_facts.get('ansible_interfaces') if not nic.startswith(nic_blacklist)]
 
     # Now process the nic list again so we can lookup speeds against pnics
     for nic_id in nics:
