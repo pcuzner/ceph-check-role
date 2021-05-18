@@ -651,7 +651,7 @@ class Checker(object):
         self._add_check('check iscsi gateway pre-reqs')
         if 'iscsigws' in self.roles:
 
-            if self.host_details['distribution'] == 'RedHat':
+            if self.host_details['distribution'] == 'RedHat' or self.host_details['distribution'] == 'CentOS':
                 maj_v, min_v = self.host_details['distribution_version'].split('.')
                 version_int = (int(maj_v) * 10) + (int(min_v) * 1)
                 # check the version is above 7.5
