@@ -593,7 +593,7 @@ class Checker(object):
 
         optimum_bandwidth = self.osd_count * self.osd_bandwidth[self.osd_media]
         if self.net_max < optimum_bandwidth:
-            self._add_problem("warning", "Network bandwith low for the number of potential OSDs")
+            self._add_problem("warning", "Network bandwidth low for the number of potential OSDs")
 
     def _check_cpu(self):
         self._add_check("_check_cpu")
